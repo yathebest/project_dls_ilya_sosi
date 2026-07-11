@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Нормализация адресов</title>
+<style>
+  body{font:16px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0f1117;color:#e6e9ef;max-width:720px;margin:40px auto;padding:0 20px}
+  h1{font-size:22px}
+  .muted{color:#9aa3b2;font-size:14px}
+  input{width:100%;padding:11px 13px;font-size:16px;border-radius:8px;border:1px solid #2a3040;background:#171a23;color:#e6e9ef;margin:12px 0}
+  .card{border:1px solid #262b38;border-radius:8px;padding:10px 14px;margin:8px 0;background:#171a23}
+  .rank{color:#6ea8fe;font-weight:600}
+  .region{color:#9aa3b2;font-size:13px}
+  .id{color:#7ee787;font-size:12px}
+</style>
+</head>
+<body>
+<h1>🏠 Нормализация адресов</h1>
+<p class="muted">Введите «грязный» адрес → канонический объект (демо, синтетическая база). Гибрид: char-n-gram + BM25 + точный реранк.</p>
+<input id="q" placeholder="напр.: казань баумана 15 к2, или мск ленина 12" autofocus>
+<div id="out"></div>
+<script>
+const q = document.getElementById('q'), out = document.getElementById('out');
+let timer;
+q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 250); });
+async function run(){
+  if(!q.value.trim()){ out.innerHTML=''; return; }
+  const r = await fetch('/search?q=' + encodeURIComponent(q.value));
+  const data = await r.json();
+  out.innerHTML = data.results.map((x,i) =>
+    `<div class="card"><span class="rank">#${i+1}</span> ${x.address}
+     <div class="region">${x.region}</div>
+     <div class="id">FIAS id: ${x.fias_id}</div></div>`).join('');
+}
+</script>
+</body>
+</html>

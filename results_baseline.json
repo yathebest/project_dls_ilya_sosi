@@ -1,0 +1,35 @@
+{
+  "config": {
+    "n": 5000,
+    "per_category": 100,
+    "embedder": "charngram",
+    "model": "deepvk/USER-bge-m3",
+    "index": "ivfpq",
+    "seed": 20260605
+  },
+  "n": 5000,
+  "n_queries": 600,
+  "index": "faiss-ivfpq",
+  "index_mb": 5.42,
+  "build_s": 0.8,
+  "latency_ms": {
+    "p50": 0.09045000115293078,
+    "p95": 0.09689999606052879,
+    "p99": 0.10623599380778612
+  },
+  "metrics": {
+    "recall_at_1": 0.6466666666666666,
+    "recall_at_5": 0.7683333333333333,
+    "recall_at_10": 0.8066666666666666,
+    "mrr_at_10": 0.7002705026455027,
+    "ndcg_at_10": 0.7259576311664548,
+    "per_category_recall_at_1": {
+      "abbreviation": 0.87,
+      "irrelevant_words": 0.93,
+      "missing_region": 0.32,
+      "misspelling": 0.9,
+      "reorder": 0.84,
+      "transliteration": 0.02
+    }
+  }
+}
