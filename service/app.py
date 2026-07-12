@@ -19,6 +19,25 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 
+def _load_dotenv():
+    """Read KEY=VALUE lines from a gitignored .env at project root into env.
+    Lets you drop YANDEX_MAPS_API_KEY there instead of exporting it each run."""
+    path = os.path.join(ROOT, ".env")
+    if not os.path.exists(path):
+        return
+    try:
+        for line in open(path, encoding="utf-8-sig"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception:
+        pass
+
+
+_load_dotenv()
+
+
 class NeuralEngine:
     """Fine-tuned encoder + prebuilt FAISS HNSW index (with coordinates)."""
 

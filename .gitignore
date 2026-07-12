@@ -11,3 +11,5 @@ gar/
 .ipynb_checkpoints/
 
 index/
+
+.env
