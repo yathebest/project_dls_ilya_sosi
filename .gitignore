@@ -11,5 +11,8 @@ gar/
 .ipynb_checkpoints/
 
 index/
+index_ru/
+*.osm.pbf
+*.nodecache
 
 .env

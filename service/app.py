@@ -77,6 +77,73 @@ class NeuralEngine:
         return out
 
 
+class NeuralEnginePQ:
+    """National base: fine-tuned encoder + FAISS IVF-PQ + SQLite metadata.
+
+    Vectors are PQ-compressed (lossy), so we over-fetch `rerank` candidates,
+    pull their text from SQLite, re-encode them and score exactly against the
+    query vector (cheap, recovers most of the PQ recall loss, L9)."""
+
+    has_coords = True
+
+    def __init__(self, index_dir):
+        import sqlite3
+        import threading
+        import numpy as np
+        import faiss
+        import torch
+        from sentence_transformers import SentenceTransformer
+
+        cfg = json.load(open(os.path.join(index_dir, "config.json"), encoding="utf-8"))
+        self.qp = cfg.get("query_prefix", "")
+        self.dp = "passage: " if "e5" in cfg["model"].lower() else ""
+        self.rerank = int(cfg.get("rerank", 100))
+        self.index = faiss.read_index(os.path.join(index_dir, "ivfpq.faiss"))
+        self.index.nprobe = int(cfg.get("nprobe", 32))
+        self.db = sqlite3.connect(os.path.join(index_dir, "meta.sqlite"),
+                                  check_same_thread=False)
+        self.lock = threading.Lock()
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = SentenceTransformer(cfg["model"], device=dev)
+        self.model.max_seq_length = 64
+        self._np = np
+        print(f"NeuralEnginePQ: {cfg['n']:,} addresses, IVF-PQ nprobe="
+              f"{self.index.nprobe} rerank={self.rerank}, dev={dev}")
+
+    def _rows(self, ids):
+        q = "SELECT rowid,text,region,city,lat,lon FROM addr WHERE rowid IN (%s)" % \
+            ",".join("?" * len(ids))
+        with self.lock:
+            cur = self.db.execute(q, ids)
+            by_id = {r[0]: r for r in cur.fetchall()}
+        return by_id
+
+    def search(self, query, k=8):
+        np = self._np
+        qv = self.model.encode([self.qp + query], normalize_embeddings=True,
+                               convert_to_numpy=True).astype(np.float32)
+        n = max(self.rerank, k)
+        _, I = self.index.search(np.ascontiguousarray(qv), n)
+        ids = [int(i) for i in I[0] if i >= 0]
+        if not ids:
+            return []
+        rows = self._rows(ids)
+        cand = [rows[i] for i in ids if i in rows]
+        # exact re-rank: re-encode candidate texts, score vs query vector
+        cvec = self.model.encode([self.dp + (r[1] or "") for r in cand],
+                                 normalize_embeddings=True,
+                                 convert_to_numpy=True).astype(np.float32)
+        scores = (cvec @ qv[0])
+        order = np.argsort(-scores)[:k]
+        out = []
+        for j in order:
+            _, text, region, city, lat, lon = cand[int(j)]
+            out.append({"address": text, "region": region, "city": city,
+                        "lat": lat, "lon": lon,
+                        "score": round(float(scores[int(j)]), 4)})
+        return out
+
+
 class FallbackEngine:
     """Synthetic char-n-gram engine when no prebuilt index exists (no coords)."""
 
@@ -106,10 +173,15 @@ class FallbackEngine:
 
 
 def build_engine():
+    # Prefer the national IVF-PQ base (index_ru/), then the HNSW base (index/),
+    # then the synthetic fallback.
+    pq_dir = os.path.join(ROOT, "index_ru")
+    if os.path.exists(os.path.join(pq_dir, "ivfpq.faiss")):
+        return NeuralEnginePQ(pq_dir)
     index_dir = os.path.join(ROOT, "index")
     if os.path.exists(os.path.join(index_dir, "hnsw.faiss")):
         return NeuralEngine(index_dir)
-    print("index/ not found -> FallbackEngine (no coordinates). Run build_index.py.")
+    print("no prebuilt index -> FallbackEngine (no coordinates). Run build_index.py.")
     return FallbackEngine()
 
 
