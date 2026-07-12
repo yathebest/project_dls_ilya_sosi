@@ -48,6 +48,25 @@ python run_hybrid.py  && python make_plots.py        # -> figures/*.png
 uvicorn service.app:app                              # demo at http://127.0.0.1:8000
 ```
 
+## Web demo (search UI + Yandex map)
+
+Type a dirty address → canonical candidates pinned on a Yandex map (coordinates
+come from the OSM base). Uses the fine-tuned encoder + a prebuilt HNSW index.
+
+```bash
+python build_index.py --limit 0                 # embed the base once (GPU); index/ (gitignored)
+set YANDEX_MAPS_API_KEY=<your Yandex JS API key> # same env style as ortouz (VITE_YANDEX_MAPS_API_KEY)
+pip install fastapi "uvicorn[standard]"
+uvicorn service.app:app                          # open http://127.0.0.1:8000
+```
+
+`service/app.py` serves `/search?q=` (fine-tuned model → HNSW → candidates with
+lat/lon) and `/` (the map page; the key is injected from the env var, never
+committed). Yandex Maps loading is ported from ortouz (`api-maps.yandex.ru/2.1`
+→ `ymaps.ready` → `Map` + `Placemark` + `setBounds`). Without a key the search
+still works, results show as a list. Without `index/` it falls back to a small
+synthetic char-n-gram engine (no coordinates).
+
 ## Results (real OSM data)
 
 Base: **623,116 addresses across 14 Russian regions** (OpenStreetMap, with

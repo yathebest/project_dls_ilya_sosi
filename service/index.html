@@ -5,34 +5,125 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Нормализация адресов</title>
 <style>
-  body{font:16px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0f1117;color:#e6e9ef;max-width:720px;margin:40px auto;padding:0 20px}
-  h1{font-size:22px}
-  .muted{color:#9aa3b2;font-size:14px}
-  input{width:100%;padding:11px 13px;font-size:16px;border-radius:8px;border:1px solid #2a3040;background:#171a23;color:#e6e9ef;margin:12px 0}
-  .card{border:1px solid #262b38;border-radius:8px;padding:10px 14px;margin:8px 0;background:#171a23}
-  .rank{color:#6ea8fe;font-weight:600}
-  .region{color:#9aa3b2;font-size:13px}
-  .id{color:#7ee787;font-size:12px}
+  :root{--bg:#0f1117;--panel:#171a23;--text:#e6e9ef;--muted:#9aa3b2;--accent:#6ea8fe;--accent2:#7ee787;--border:#262b38}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;height:100vh;display:flex;flex-direction:column}
+  header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+  h1{font-size:18px;margin:0 0 8px}
+  .muted{color:var(--muted);font-size:13px}
+  input{width:100%;max-width:640px;padding:11px 14px;font-size:16px;border-radius:10px;border:1px solid var(--border);background:#0f1117;color:var(--text)}
+  main{flex:1;display:flex;min-height:0}
+  #list{width:400px;max-width:42vw;overflow-y:auto;border-right:1px solid var(--border);padding:8px}
+  #map{flex:1;min-width:0}
+  .card{border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin:6px 4px;cursor:pointer;background:var(--panel)}
+  .card:hover{border-color:var(--accent)}
+  .card.active{border-color:var(--accent2);background:rgba(126,231,135,.06)}
+  .rank{color:var(--accent);font-weight:700;margin-right:6px}
+  .addr{color:#fff}
+  .sub{color:var(--muted);font-size:12px;margin-top:3px}
+  .score{color:var(--accent2);font-size:12px}
+  .hint{color:var(--muted);padding:14px}
+  .nomap{display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:20px}
 </style>
 </head>
 <body>
-<h1>🏠 Нормализация адресов</h1>
-<p class="muted">Введите «грязный» адрес → канонический объект (демо, синтетическая база). Гибрид: char-n-gram + BM25 + точный реранк.</p>
-<input id="q" placeholder="напр.: казань баумана 15 к2, или мск ленина 12" autofocus>
-<div id="out"></div>
+<header>
+  <h1>🏠 Нормализация адресов</h1>
+  <div class="muted">Введите «грязный» адрес → канонический объект на карте. Дообученный энкодер + HNSW.</div>
+  <div style="margin-top:10px"><input id="q" placeholder="напр.: казань бауманна 15  ·  ul Baumana 15  ·  екб ленина 20 к3" autofocus></div>
+</header>
+<main>
+  <div id="list"><div class="hint">Начните вводить адрес…</div></div>
+  <div id="map"></div>
+</main>
+
 <script>
-const q = document.getElementById('q'), out = document.getElementById('out');
-let timer;
-q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 250); });
-async function run(){
-  if(!q.value.trim()){ out.innerHTML=''; return; }
-  const r = await fetch('/search?q=' + encodeURIComponent(q.value));
-  const data = await r.json();
-  out.innerHTML = data.results.map((x,i) =>
-    `<div class="card"><span class="rank">#${i+1}</span> ${x.address}
-     <div class="region">${x.region}</div>
-     <div class="id">FIAS id: ${x.fias_id}</div></div>`).join('');
+const YKEY = "__YANDEX_KEY__";               // injected by the server from env
+const listEl = document.getElementById('list');
+const mapEl = document.getElementById('map');
+let map = null, ymapsReady = false, placemarks = [], lastResults = [];
+
+function loadYandex(){
+  if(!YKEY){ mapEl.innerHTML = '<div class="nomap">Карта Яндекса отключена: не задан ключ.<br>Установите переменную окружения YANDEX_MAPS_API_KEY и перезапустите сервис.<br>Поиск работает и без карты — результаты слева.</div>'; return; }
+  const s = document.createElement('script');
+  s.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(YKEY)}&lang=ru_RU`;
+  s.async = true;
+  s.onload = () => ymaps.ready(initMap);
+  s.onerror = () => { mapEl.innerHTML = '<div class="nomap">Не удалось загрузить Яндекс.Карты.</div>'; };
+  document.head.appendChild(s);
 }
+
+function initMap(){
+  map = new ymaps.Map(mapEl, { center: [55.79, 49.12], zoom: 11, controls: ['zoomControl','geolocationControl'] });
+  ymapsReady = true;
+  if(lastResults.length) renderMarkers(lastResults);
+}
+
+function renderMarkers(results){
+  if(!ymapsReady || !map) return;
+  map.geoObjects.removeAll();
+  placemarks = [];
+  const coords = [];
+  results.forEach((r, i) => {
+    if(r.lat == null || r.lon == null) return;
+    const pm = new ymaps.Placemark([r.lat, r.lon], {
+      iconContent: String(i+1),
+      hintContent: r.address,
+      balloonContentHeader: `${i+1}. ${escapeHtml(r.address)}`,
+      balloonContentBody: `<span style="color:#555">${escapeHtml(r.region||'')}</span>`,
+    }, { preset: i === 0 ? 'islands#greenStretchyIcon' : 'islands#blueStretchyIcon' });
+    map.geoObjects.add(pm);
+    placemarks.push(pm);
+    coords.push([r.lat, r.lon]);
+  });
+  if(coords.length === 1){ map.setCenter(coords[0], 16, {duration:200}); }
+  else if(coords.length > 1){
+    try { map.setBounds(map.geoObjects.getBounds(), {checkZoomRange:true, zoomMargin:40, duration:200}); }
+    catch(e){ map.setCenter(coords[0], 13); }
+  }
+}
+
+function renderList(results){
+  if(!results.length){ listEl.innerHTML = '<div class="hint">Ничего не найдено.</div>'; return; }
+  listEl.innerHTML = results.map((r,i) =>
+    `<div class="card" data-i="${i}">
+       <div><span class="rank">#${i+1}</span><span class="addr">${escapeHtml(r.address)}</span></div>
+       <div class="sub">${escapeHtml(r.region||'')}${r.lat!=null?` · ${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}`:''}</div>
+       ${r.score!=null?`<div class="score">score ${r.score}</div>`:''}
+     </div>`).join('');
+  [...listEl.querySelectorAll('.card')].forEach(el => el.addEventListener('click', () => selectItem(+el.dataset.i)));
+}
+
+function selectItem(i){
+  [...listEl.querySelectorAll('.card')].forEach((el,j)=>el.classList.toggle('active', j===i));
+  const r = lastResults[i];
+  if(ymapsReady && r && r.lat != null){
+    map.setCenter([r.lat, r.lon], 17, {duration:250});
+    if(placemarks[i]) placemarks[i].balloon.open();
+  }
+}
+
+let timer;
+document.getElementById('q').addEventListener('input', e => {
+  clearTimeout(timer);
+  const q = e.target.value.trim();
+  if(!q){ listEl.innerHTML = '<div class="hint">Начните вводить адрес…</div>'; if(ymapsReady) map.geoObjects.removeAll(); return; }
+  timer = setTimeout(() => runSearch(q), 250);
+});
+
+async function runSearch(q){
+  try{
+    const res = await fetch('/search?q=' + encodeURIComponent(q));
+    const data = await res.json();
+    lastResults = data.results || [];
+    renderList(lastResults);
+    renderMarkers(lastResults);
+  }catch(e){ listEl.innerHTML = '<div class="hint">Ошибка запроса.</div>'; }
+}
+
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+loadYandex();
 </script>
 </body>
 </html>
