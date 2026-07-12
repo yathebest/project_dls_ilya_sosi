@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Нормализация адресов — защита проекта</title>
+<style>
+  :root{--bg:#0f1117;--panel:#171a23;--text:#e6e9ef;--muted:#9aa3b2;--accent:#6ea8fe;--accent2:#7ee787;--border:#262b38;--code:#1d212c;--warn:#ffbf69}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:17px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .slide{min-height:100vh;padding:6vh 8vw;border-bottom:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;position:relative}
+  .num{position:absolute;top:18px;right:26px;color:var(--muted);font-size:13px}
+  .q{color:var(--accent);font-size:14px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+  h1{font-size:40px;margin:0 0 10px;line-height:1.15}
+  h2{font-size:30px;margin:0 0 16px;line-height:1.2}
+  p{margin:8px 0;font-size:19px}
+  ul{margin:8px 0;padding-left:24px}
+  li{margin:7px 0;font-size:18px}
+  strong{color:#fff}
+  code{font-family:Consolas,Monaco,monospace;background:var(--code);padding:1px 6px;border-radius:5px;color:#d9e1ff;font-size:.88em}
+  .flow{background:var(--code);border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;margin:12px 0;font-family:Consolas,Monaco,monospace;color:#cfe2ff;overflow-x:auto;font-size:15px;white-space:pre;line-height:1.5}
+  .key{border-left:3px solid var(--accent2);background:rgba(126,231,135,.08);padding:12px 16px;border-radius:8px;margin:12px 0;font-size:18px}
+  .warn{border-left:3px solid var(--warn);background:rgba(255,191,105,.09);padding:12px 16px;border-radius:8px;margin:12px 0;font-size:18px}
+  table{border-collapse:collapse;margin:12px 0;font-size:17px}
+  th,td{border:1px solid var(--border);padding:8px 14px;text-align:left}
+  th{background:var(--panel);color:#fff}
+  img{max-width:min(760px,80vw);border:1px solid var(--border);border-radius:8px;margin:10px 0}
+  .big{font-size:26px;color:var(--accent2);font-weight:600}
+  @media print{body{font-size:13px}.slide{min-height:auto;page-break-after:always;border:none;padding:14mm}img{max-width:150mm}@page{size:A4 landscape;margin:0}}
+</style>
+</head>
+<body>
+
+<section class="slide">
+  <div class="num">1</div>
+  <h1>🏠 Нормализация адресов<br>через векторный поиск</h1>
+  <p style="color:var(--muted)">Deep Learning for Search 2026 · Innopolis · вдохновлено AddrLLM (JD Logistics, SIGIR-класс, arXiv 2411.13584)</p>
+  <p class="big">Грязная строка адреса → канонический объект с координатами</p>
+</section>
+
+<section class="slide">
+  <div class="num">2</div>
+  <div class="q">Вопрос 1 — ценность и кому нужно</div>
+  <h2>Value proposition</h2>
+  <p><strong>Проблема:</strong> адреса приходят в свободной форме — опечатки, сокращения, транслит, пропуски, перестановки. Это ломает доставку, дедупликацию клиентов, геокодинг, KYC.</p>
+  <ul>
+    <li><strong>Кому:</strong> логистика/e-commerce, банки/страховые (KYC), гос/ЖКХ, CRM (дедуп).</li>
+    <li><strong>Наше решение:</strong> open-source, self-hosted, офлайн — приватная альтернатива платному DaData.</li>
+    <li><strong>RAG-принцип:</strong> знания в индексе, не в весах → база адресов обновляется <em>без переобучения модели</em>.</li>
+  </ul>
+  <div class="key">Бизнес-эффект (AddrLLM на JD): −43% пересорта посылок, ~$2M/год экономии. Ошибка адреса = реальные деньги.</div>
+</section>
+
+<section class="slide">
+  <div class="num">3</div>
+  <div class="q">Задача</div>
+  <h2>Это не классификация — это поиск (matching)</h2>
+  <div class="flow">Дано:  база N≥500k канонических адресов (с координатами)
+Вход:  грязный адрес q  ("мск ленинский пр-т 12 к3", "ul Baumana 15")
+Цель:  c* = argmax cos(q, c)  →  канонический объект + id + координаты</div>
+  <p>Сигнал смешанный: <strong>семантический</strong> (сокращения, транслит) + <strong>символьный/лексический</strong> (опечатки, номера домов) → это ровно кейс для нейро-эмбеддингов + гибрида.</p>
+</section>
+
+<section class="slide">
+  <div class="num">4</div>
+  <div class="q">Вопрос 2 — архитектура</div>
+  <h2>Архитектура системы</h2>
+  <div class="flow">BUILD (офлайн):
+  OSM (Overpass) → канон.строки + координаты + метаданные
+   → энкодер → векторы → индекс (HNSW / IVF-PQ)
+
+QUERY (онлайн, &lt;100 мс):
+  грязный адрес → энкодер → ANN(HNSW, косинус) → top-k
+   → [опц.] нейро cross-encoder реранк → канонический объект + id + (lat,lon)</div>
+  <p>5 обязательных элементов: <strong>модель</strong> (эмбеддер), <strong>векторная БД</strong> (FAISS/Qdrant), <strong>индекс</strong> (HNSW/IVF-PQ), <strong>поиск</strong> (косинус + гибрид/реранк).</p>
+</section>
+
+<section class="slide">
+  <div class="num">5</div>
+  <div class="q">Вопрос 3 — технологии и обоснование</div>
+  <h2>Ключевые технологии</h2>
+  <table>
+    <tr><th>Компонент</th><th>Выбор</th><th>Почему (по замерам)</th></tr>
+    <tr><td>Данные</td><td>OpenStreetMap / Overpass</td><td>открыто, ≥500k, есть координаты</td></tr>
+    <tr><td>Эмбеддер</td><td>multilingual-e5 / USER-bge-m3</td><td>многоязычный → чинит транслит; 384-d (компактный)</td></tr>
+    <tr><td>Индекс</td><td>FAISS HNSW / IVF-PQ</td><td>×110 быстрее / ×130 меньше памяти</td></tr>
+    <tr><td>Sparse</td><td>char-n-gram + BM25</td><td>устойчивость к опечаткам / точные токены</td></tr>
+    <tr><td>Слияние/реранк</td><td>RRF + cross-encoder</td><td>только где сигналы комплементарны</td></tr>
+  </table>
+  <p style="color:var(--muted)">Каждый выбор подкреплён числом в сравнительной таблице, а не «по моде».</p>
+</section>
+
+<section class="slide">
+  <div class="num">6</div>
+  <div class="q">Вопрос 4 — экспериментальный пайплайн</div>
+  <h2>Как ставим эксперименты и оцениваем</h2>
+  <ul>
+    <li><strong>Валидация без ручной разметки:</strong> генератор синтетического шума по <em>таксономии AddrLLM</em> (опечатки, сокращения, пропуск региона, мусор, перестановка, транслит) → каждый запрос привязан к известному id.</li>
+    <li><strong>Метрики (руками):</strong> Recall@1/5/10, MRR@10, nDCG@10, гео <strong>Acc@300/500m</strong>; + latency p50/p95/p99, память, время индекса.</li>
+    <li><strong>3+ итерации:</strong> char-baseline → индекс/квантизация (Pareto) → нейро-энкодер → дообучение + geo-голова.</li>
+  </ul>
+  <div class="key">Всё логируется в <code>results_*.json</code> + графики → воспроизводимо (seed 20260605).</div>
+</section>
+
+<section class="slide">
+  <div class="num">7</div>
+  <div class="q">Результаты — эффективность индекса (реальные 80k)</div>
+  <h2>Pareto: recall ↔ скорость ↔ память</h2>
+  <img src="figures/index_compare.png" alt="index comparison">
+  <p>Flat 0.82 / 1310 МБ / 31 мс → <strong>HNSW</strong> 0.74 / <strong>0.28 мс</strong> (×110) → <strong>IVF-PQ</strong> 0.54 / <strong>10 МБ</strong> (×130). IVF-PQ требует exact re-rank для восстановления recall (урок L9).</p>
+</section>
+
+<section class="slide">
+  <div class="num">8</div>
+  <div class="q">Результаты — главный выигрыш</div>
+  <h2>Нейро-энкодер чинит транслитерацию</h2>
+  <img src="figures/neural_vs_char.png" alt="neural vs char">
+  <p><span class="big">transliteration: 0.04 → 0.67</span> · R@1 0.82→0.86 · Acc@500m 0.83→0.92 · вектор <strong>384-d</strong> (меньше char-n-gram 4096) и быстрее.</p>
+</section>
+
+<section class="slide">
+  <div class="num">9</div>
+  <div class="q">Результаты — честная находка</div>
+  <h2>Гибрид/реранк — не серебряная пуля</h2>
+  <table>
+    <tr><th>Система (8k)</th><th>R@1</th><th>transliteration</th></tr>
+    <tr><td>нейро dense (один)</td><td class="big">0.88</td><td>0.62</td></tr>
+    <tr><td>нейро + BM25 (RRF)</td><td>0.83</td><td>0.25</td></tr>
+    <tr><td>+ лексический реранк</td><td>0.84</td><td>0.10</td></tr>
+  </table>
+  <div class="warn">Когда один ретривер сильно доминирует, слияние со слабым BM25 <strong>тянет вниз</strong> (0.88→0.83); лексический реранк <strong>ломает транслит</strong> (0.62→0.10) — латиница≠кириллица. Вывод (урок L8): гибрид/реранк применять <em>с умом</em>, реранк — только <em>нейро</em> cross-encoder.</div>
+</section>
+
+<section class="slide">
+  <div class="num">10</div>
+  <div class="q">Вопрос 5 — что эффективнее и почему</div>
+  <h2>Рекомендуемая архитектура</h2>
+  <div class="flow">нейро multilingual-энкодер → HNSW  (основа: R@1 0.88, 384-d, p50 0.02 мс)
+   + int8/PQ + exact re-rank      (память ×4–30 без потери качества)
+   + нейро cross-encoder реранк   (только на shortlist, где помогает)</div>
+  <ul>
+    <li><strong>Почему:</strong> нейро-dense — лучший одиночный по recall и по транслиту, при меньшем векторе и суб-мс задержке.</li>
+    <li><strong>Почему не «всё сразу»:</strong> измерили — наивный гибрид и лексический реранк здесь вредят.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="num">11</div>
+  <div class="q">Вопрос 6 — требования к железу</div>
+  <h2>Dev vs Inference</h2>
+  <table>
+    <tr><th></th><th>Development (офлайн)</th><th>Inference (онлайн)</th></tr>
+    <tr><td>Что</td><td>эмбеддинг базы, дообучение, построение индекса</td><td>эмбеддинг запроса + ANN + реранк</td></tr>
+    <tr><td>Железо</td><td>GPU (или CPU медленнее); диск под модель ~0.5–2 ГБ</td><td><strong>CPU-servable</strong></td></tr>
+    <tr><td>Память</td><td>~1–3 ГБ при построении</td><td>80k нейро-векторов ≈ <strong>123 МБ</strong> (int8/PQ ещё меньше)</td></tr>
+    <tr><td>Задержка</td><td>часы (один раз)</td><td>HNSW p50 <strong>0.02 мс</strong> поиска; полный путь &lt;100 мс</td></tr>
+  </table>
+  <p style="color:var(--muted)">Квантизация + дистилляция → инференс без GPU.</p>
+</section>
+
+<section class="slide">
+  <div class="num">12</div>
+  <div class="q">Связь с наукой</div>
+  <h2>Что взяли из AddrLLM и что — нет</h2>
+  <ul>
+    <li>✅ <strong>Взяли:</strong> идею geocoding-aware энкодера (эмбеддинг ∝ гео-расстоянию), таксономию ошибок, метрику robustness, retrieve-then-read.</li>
+    <li>❌ <strong>Не делали:</strong> SFT 7B-LLM + PPO/RL + кластер 10×H800 — вне бюджета. Мы фокусируемся на <em>ретривере</em> — векторном ядре, которое и есть предмет курса.</li>
+  </ul>
+  <div class="key">Честный scope: масштабировали вниз именно ту часть AddrLLM, что относится к векторному поиску.</div>
+</section>
+
+<section class="slide">
+  <div class="num">13</div>
+  <div class="q">Итог</div>
+  <h2>Что сделано и что дальше</h2>
+  <ul>
+    <li><strong>Сделано:</strong> реальные данные OSM (+координаты), 3 итерации, нейро-энкодер (транслит 0.04→0.67), Pareto индексов/квантизации, гибрид+реранк, гео-метрика, сервис (FastAPI+UI), воспроизводимо, в git.</li>
+    <li><strong>Дальше:</strong> добор до ≥500k (мультирегион), дообучение + geo-голова, нейро cross-encoder реранк.</li>
+  </ul>
+  <p style="color:var(--muted)">Репозиторий: github.com/yathebest/project_dlc · демо: <code>uvicorn service.app:app</code></p>
+</section>
+
+</body>
+</html>
