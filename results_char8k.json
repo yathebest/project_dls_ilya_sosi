@@ -1,0 +1,36 @@
+{
+  "config": {
+    "n": 5000,
+    "per_category": 100,
+    "embedder": "charngram",
+    "model": "deepvk/USER-bge-m3",
+    "index": "flat",
+    "seed": 20260605,
+    "dataset": "data/canon_8k.jsonl"
+  },
+  "n": 8000,
+  "n_queries": 600,
+  "index": "flat-numpy",
+  "index_mb": 131.07,
+  "build_s": 1.15,
+  "latency_ms": {
+    "p50": 2.6704500014602672,
+    "p95": 3.0374300036783097,
+    "p99": 3.1503679983870825
+  },
+  "metrics": {
+    "recall_at_1": 0.8083333333333333,
+    "recall_at_5": 0.8383333333333334,
+    "recall_at_10": 0.86,
+    "mrr_at_10": 0.8229239417989418,
+    "ndcg_at_10": 0.8316165908776731,
+    "per_category_recall_at_1": {
+      "abbreviation": 0.99,
+      "irrelevant_words": 0.99,
+      "missing_region": 0.94,
+      "misspelling": 0.91,
+      "reorder": 0.98,
+      "transliteration": 0.04
+    }
+  }
+}

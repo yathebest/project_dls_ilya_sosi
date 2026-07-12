@@ -32,19 +32,27 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
     ap.add_argument("--n", type=int, default=N)
+    ap.add_argument("--embedder", choices=["charngram", "st"], default="charngram")
+    ap.add_argument("--model", default="deepvk/USER-bge-m3")
     args = ap.parse_args()
 
     canon = get_canonicals(args.n, args.dataset)
     texts = [c["text"] for c in canon]
 
-    vec = make_vectorizer("charngram")
-    doc_vecs = vec.fit_transform(texts)
+    if args.embedder == "st":
+        vec = make_vectorizer("st", model_name=args.model,
+                              query_prefix="query: ", doc_prefix="passage: ")
+        doc_vecs = vec.transform(texts)
+    else:
+        vec = make_vectorizer("charngram")
+        doc_vecs = vec.fit_transform(texts)
     dense = FlatIndex(doc_vecs)
     bm25 = BM25().fit(texts)
 
     eval_set = make_eval_set(canon, PER_CAT)
     q_texts = [q for q, _, _ in eval_set]
-    q_vecs = vec.transform(q_texts)
+    q_vecs = (vec.transform(q_texts, is_query=True) if args.embedder == "st"
+              else vec.transform(q_texts))
 
     systems = {"dense": [], "bm25": [], "hybrid": [], "hybrid+rerank": []}
     lat = {k: [] for k in systems}

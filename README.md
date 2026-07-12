@@ -48,20 +48,23 @@ python run_hybrid.py  && python make_plots.py        # -> figures/*.png
 uvicorn service.app:app                              # demo at http://127.0.0.1:8000
 ```
 
-## Current demo numbers (synthetic, N=5000, char-n-gram)
+## Results (real OSM data, ~80k Tatarstan addresses)
 
-**Iter 0** (Flat): Recall@1 ≈ 0.80, MRR@10 ≈ 0.82, p50 ≈ 2 ms. Weak on
-**transliteration (0.14)** and **missing_region (0.68)** → motivates Iter 2/3.
-
-**Iter 1 index:** Flat 0.80 / 82 MB / 2 ms → HNSW 0.75 / 0.2 ms → IVF-PQ 0.63 /
-**5 MB** / 0.16 ms (add exact re-rank to recover recall — L9).
-
-**Iter 1 shrink:** int8 0.80 / **20 MB** (≈free ×4) · PCA-256 0.78 / **5 MB** (×16)
-· PCA-64 0.71 / **1.3 MB** (×63) · binary 0.77 / **2.6 MB** (×32).
-
-**Iter 2 hybrid:** dense 0.798 → bm25 0.872 → hybrid 0.847 → **hybrid+rerank
-0.903** (R@10 = 1.000, MRR@10 = 0.940). Best in every noise category; transliteration
-0.14 → 0.46, missing_region 0.68 → 0.98.
+- **Iter 0 baseline** (char-n-gram, Flat): R@1 0.82, MRR@10 0.83, **Acc@500m 0.83**,
+  p50 31 ms. Robust on typos/abbrev/junk, but **transliteration 0.02** (char-n-gram
+  can't bridge Cyrillic↔Latin).
+- **Iter 1 index** (80k): Flat 0.82 / 1310 MB / 31 ms → HNSW 0.74 / **0.28 ms**
+  (×110 faster) → IVF-PQ 0.54 / **10 MB** (×130 smaller); add exact re-rank to
+  recover IVF-PQ recall (L9).
+- **Iter 1 shrink** (method): int8 ≈free ×4 · PCA-256 ×16 · binary ×32.
+- **Iter 3 neural encoder** (multilingual-e5-small, 8k, HNSW): R@1 **0.86**,
+  R@5 **0.93**, **Acc@500m 0.92**, **transliteration 0.04 → 0.67**, only 384-dim
+  (smaller than char-n-gram) and p50 0.02 ms. **Biggest single win.**
+- **Hybrid caveat (real finding):** neural dense alone (R@1 **0.88**) *beats* naive
+  neural+BM25 RRF (0.83) here — when one retriever dominates, fusing a weaker one
+  adds noise (L8); and the *lexical* reranker hurts transliteration (0.62→0.10),
+  so cross-lingual needs a **neural** cross-encoder, not lexical. Apply hybrid/rerank
+  judiciously, not by default.
 
 ## Real data (OpenStreetMap)
 
