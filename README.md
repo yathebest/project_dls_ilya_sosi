@@ -48,7 +48,12 @@ python run_hybrid.py  && python make_plots.py        # -> figures/*.png
 uvicorn service.app:app                              # demo at http://127.0.0.1:8000
 ```
 
-## Results (real OSM data, ~80k Tatarstan addresses)
+## Results (real OSM data)
+
+Base: **623,116 addresses across 14 Russian regions** (OpenStreetMap, with
+coordinates) — meets the ≥500k requirement with regional variety. Detailed
+quality runs below use CPU-feasible 8k/80k subsets of this base.
+
 
 - **Iter 0 baseline** (char-n-gram, Flat): R@1 0.82, MRR@10 0.83, **Acc@500m 0.83**,
   p50 31 ms. Robust on typos/abbrev/junk, but **transliteration 0.02** (char-n-gram

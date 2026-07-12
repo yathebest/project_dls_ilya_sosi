@@ -35,6 +35,7 @@
   <div class="num">1</div>
   <h1>🏠 Нормализация адресов<br>через векторный поиск</h1>
   <p style="color:var(--muted)">Deep Learning for Search 2026 · Innopolis · вдохновлено AddrLLM (JD Logistics, SIGIR-класс, arXiv 2411.13584)</p>
+  <p style="color:var(--muted)">База: <strong>623 116</strong> адресов из <strong>14 регионов</strong> РФ (OpenStreetMap, с координатами)</p>
   <p class="big">Грязная строка адреса → канонический объект с координатами</p>
 </section>
 
@@ -81,7 +82,7 @@ QUERY (онлайн, &lt;100 мс):
   <h2>Ключевые технологии</h2>
   <table>
     <tr><th>Компонент</th><th>Выбор</th><th>Почему (по замерам)</th></tr>
-    <tr><td>Данные</td><td>OpenStreetMap / Overpass</td><td>открыто, ≥500k, есть координаты</td></tr>
+    <tr><td>Данные</td><td>OpenStreetMap / Overpass</td><td>открыто, 623k / 14 регионов, есть координаты</td></tr>
     <tr><td>Эмбеддер</td><td>multilingual-e5 / USER-bge-m3</td><td>многоязычный → чинит транслит; 384-d (компактный)</td></tr>
     <tr><td>Индекс</td><td>FAISS HNSW / IVF-PQ</td><td>×110 быстрее / ×130 меньше памяти</td></tr>
     <tr><td>Sparse</td><td>char-n-gram + BM25</td><td>устойчивость к опечаткам / точные токены</td></tr>
@@ -99,7 +100,7 @@ QUERY (онлайн, &lt;100 мс):
     <li><strong>Метрики (руками):</strong> Recall@1/5/10, MRR@10, nDCG@10, гео <strong>Acc@300/500m</strong>; + latency p50/p95/p99, память, время индекса.</li>
     <li><strong>3+ итерации:</strong> char-baseline → индекс/квантизация (Pareto) → нейро-энкодер → дообучение + geo-голова.</li>
   </ul>
-  <div class="key">Всё логируется в <code>results_*.json</code> + графики → воспроизводимо (seed 20260605).</div>
+  <div class="key">База <strong>623k</strong> адресов (14 регионов); детальные прогоны — на CPU-выполнимых подвыборках 8k/80k. Всё логируется в <code>results_*.json</code> + графики → воспроизводимо (seed 20260605).</div>
 </section>
 
 <section class="slide">
@@ -174,8 +175,8 @@ QUERY (онлайн, &lt;100 мс):
   <div class="q">Итог</div>
   <h2>Что сделано и что дальше</h2>
   <ul>
-    <li><strong>Сделано:</strong> реальные данные OSM (+координаты), 3 итерации, нейро-энкодер (транслит 0.04→0.67), Pareto индексов/квантизации, гибрид+реранк, гео-метрика, сервис (FastAPI+UI), воспроизводимо, в git.</li>
-    <li><strong>Дальше:</strong> добор до ≥500k (мультирегион), дообучение + geo-голова, нейро cross-encoder реранк.</li>
+    <li><strong>Сделано:</strong> реальные данные OSM <strong>623k / 14 регионов</strong> (+координаты), 3 итерации, нейро-энкодер (транслит 0.04→0.67), Pareto индексов/квантизации, гибрид+реранк, гео-метрика, сервис (FastAPI+UI), воспроизводимо, в git.</li>
+    <li><strong>Дальше:</strong> дообучение энкодера + geo-голова (GPU), нейро cross-encoder реранк, замер на полной базе 623k.</li>
   </ul>
   <p style="color:var(--muted)">Репозиторий: github.com/yathebest/project_dlc · демо: <code>uvicorn service.app:app</code></p>
 </section>
