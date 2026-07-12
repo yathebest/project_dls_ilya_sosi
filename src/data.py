@@ -4,6 +4,7 @@ Default: a deterministic *synthetic* generator of Russian-style canonical
 addresses, so the whole pipeline runs end-to-end with no downloads. Swap in the
 real GAR/FIAS parser (see parse_gar stub) for the production run (>=500k objects).
 """
+import json
 import random
 
 REGIONS = [
@@ -28,10 +29,46 @@ STREETS = [
 
 def canonical_string(c):
     """Flat string used for embedding."""
-    parts = [c["region"], f"г {c['city']}", f"ул {c['street']}", f"д {c['house']}"]
+    parts = []
+    if c.get("region"):
+        parts.append(c["region"])
+    if c.get("city"):
+        parts.append(f"г {c['city']}")
+    parts.append(f"ул {c['street']}")
+    parts.append(f"д {c['house']}")
     if c.get("korp"):
         parts.append(f"к {c['korp']}")
     return ", ".join(parts)
+
+
+def save_canon(canon, path):
+    with open(path, "w", encoding="utf-8") as f:
+        for c in canon:
+            f.write(json.dumps(c, ensure_ascii=False) + "\n")
+
+
+def load_canon(path):
+    """Load a canonical base from jsonl; ids are re-numbered to row index
+    (search returns positions, so id must equal position)."""
+    canon = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            c = json.loads(line)
+            c["id"] = len(canon)
+            if not c.get("text"):
+                c["text"] = canonical_string(c)
+            canon.append(c)
+    return canon
+
+
+def get_canonicals(n, dataset=None, seed=20260605):
+    """Synthetic base by default, or a real jsonl base if --dataset given."""
+    if dataset:
+        return load_canon(dataset)
+    return generate_synthetic(n, seed)
 
 
 def generate_synthetic(n, seed=20260605):

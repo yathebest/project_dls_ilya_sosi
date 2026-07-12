@@ -6,6 +6,32 @@ import math
 from collections import defaultdict
 
 
+def haversine_m(lat1, lon1, lat2, lon2):
+    """Great-circle distance in meters."""
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def acc_at_radius(results, canon, radius_m=500):
+    """AddrLLM-style geo metric: top-1 prediction within radius_m of the gold
+    address. results: list of (ranked_ids, gold_id, category). Needs lat/lon."""
+    hit, tot = 0, 0
+    for ranked, gold, _ in results:
+        if not ranked:
+            continue
+        pred, g = canon[ranked[0]], canon[gold]
+        if g.get("lat") is None or pred.get("lat") is None:
+            continue
+        tot += 1
+        if haversine_m(pred["lat"], pred["lon"], g["lat"], g["lon"]) <= radius_m:
+            hit += 1
+    return hit / tot if tot else None
+
+
 def recall_at_k(ranked, gold, k):
     return 1.0 if gold in ranked[:k] else 0.0
 

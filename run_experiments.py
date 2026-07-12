@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, "src")
 
 import numpy as np
-from data import generate_synthetic
+from data import get_canonicals
 from noise import make_eval_set
 from vectorizer import make_vectorizer
 from index import FlatIndex, make_faiss
@@ -37,9 +37,10 @@ def main():
     ap.add_argument("--per-category", type=int, default=200)
     ap.add_argument("--embedder", choices=["charngram", "st"], default="charngram")
     ap.add_argument("--model", default="deepvk/USER-bge-m3")
+    ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
     args = ap.parse_args()
 
-    canon = generate_synthetic(args.n)
+    canon = get_canonicals(args.n, args.dataset)
     texts = [c["text"] for c in canon]
     if args.embedder == "st":
         vec = make_vectorizer("st", model_name=args.model,

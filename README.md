@@ -63,11 +63,24 @@ uvicorn service.app:app                              # demo at http://127.0.0.1:
 0.903** (R@10 = 1.000, MRR@10 = 0.940). Best in every noise category; transliteration
 0.14 → 0.46, missing_region 0.68 → 0.98.
 
-## Scaling up (production run)
+## Real data (OpenStreetMap)
 
-1. **Real data:** implement `data.parse_gar()` — download `gar_xml.zip` from
-   fias.nalog.ru (or a preconverted Kaggle/HF dump), keep ≥500k objects across
-   2–3 contrasting regions, use OBJECTGUID as the FIAS id.
+`build_dataset.py` fetches real Russian addresses **with coordinates** from the
+Overpass API and writes `data/canon.jsonl`; every run script takes `--dataset`:
+
+```bash
+python build_dataset.py                                  # default city list
+python build_dataset.py --cities "Казань:Республика Татарстан,Уфа:Республика Башкортостан"
+python run_baseline.py --dataset data/canon.jsonl        # Acc@300m/500m too (coords)
+python run_hybrid.py   --dataset data/canon.jsonl
+```
+
+Coordinates come for free → they feed the geocoding-aware head (Iter 3). For the
+full **≥500k**, add more/larger regions, or read a Geofabrik `.osm.pbf` via
+`src.osm.load_pbf` (GDAL/geopandas). For the official FIAS id instead of OSM,
+implement `data.parse_gar()` (gar_xml.zip from fias.nalog.ru).
+
+## Scaling up (neural)
 2. **Neural encoder (Iter 2/3):**
    `python run_baseline.py --embedder st --model deepvk/USER-bge-m3 --index hnsw`
 3. **Hybrid + rerank (Iter 2):** fuse dense + char-n-gram via RRF, then a

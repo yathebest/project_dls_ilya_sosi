@@ -17,11 +17,11 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, "src")
 
 import numpy as np
-from data import generate_synthetic
+from data import get_canonicals
 from noise import make_eval_set
 from vectorizer import make_vectorizer
 from index import FlatIndex, make_faiss
-from metrics import evaluate
+from metrics import evaluate, acc_at_radius
 
 
 def main():
@@ -33,12 +33,13 @@ def main():
     ap.add_argument("--index", choices=["flat", "faiss-flat", "hnsw", "ivfpq"],
                     default="flat")
     ap.add_argument("--seed", type=int, default=20260605)
+    ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
     args = ap.parse_args()
 
     print(f"== Iteration 0 baseline | embedder={args.embedder} index={args.index} ==")
 
     # 1. canonical base
-    canon = generate_synthetic(args.n, seed=args.seed)
+    canon = get_canonicals(args.n, args.dataset, seed=args.seed)
     texts = [c["text"] for c in canon]
     print(f"canonical base: {len(canon)} addresses")
 
@@ -92,6 +93,11 @@ def main():
     print("-- latency per query (ms) --")
     print(f"  p50={np.percentile(lat,50):.2f}  p95={np.percentile(lat,95):.2f}  "
           f"p99={np.percentile(lat,99):.2f}")
+    if canon and canon[0].get("lat") is not None:      # geo metric (AddrLLM style)
+        for rad in (300, 500):
+            a = acc_at_radius(results, canon, rad)
+            if a is not None:
+                print(f"  Acc@{rad}m={a:.4f}")
 
     out = dict(config=vars(args), n=len(canon), n_queries=len(eval_set),
                index=index.kind, index_mb=round(index.memory_mb(), 2),

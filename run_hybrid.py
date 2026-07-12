@@ -15,8 +15,9 @@ import time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, ".")
 
+import argparse
 import numpy as np
-from src.data import generate_synthetic
+from src.data import get_canonicals
 from src.noise import make_eval_set
 from src.vectorizer import make_vectorizer
 from src.index import FlatIndex
@@ -28,7 +29,12 @@ N, PER_CAT, SHORTLIST = 5000, 200, 50
 
 
 def main():
-    canon = generate_synthetic(N)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
+    ap.add_argument("--n", type=int, default=N)
+    args = ap.parse_args()
+
+    canon = get_canonicals(args.n, args.dataset)
     texts = [c["text"] for c in canon]
 
     vec = make_vectorizer("charngram")
@@ -65,7 +71,7 @@ def main():
         lat["hybrid+rerank"].append(lat["hybrid"][-1] + (time.perf_counter() - t) * 1000)
         systems["hybrid+rerank"].append((r_ids, gold, cat))
 
-    print(f"n={N} queries={len(eval_set)} shortlist={SHORTLIST}\n")
+    print(f"n={len(canon)} queries={len(eval_set)} shortlist={SHORTLIST}\n")
     header = f"{'system':16s}{'R@1':>8s}{'R@5':>8s}{'R@10':>8s}{'MRR@10':>9s}{'p50 ms':>9s}"
     print(header); print("-" * len(header))
     out = {}

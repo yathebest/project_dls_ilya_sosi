@@ -1,34 +1,35 @@
 {
   "config": {
     "n": 5000,
-    "per_category": 100,
+    "per_category": 150,
     "embedder": "charngram",
     "model": "deepvk/USER-bge-m3",
-    "index": "ivfpq",
-    "seed": 20260605
+    "index": "flat",
+    "seed": 20260605,
+    "dataset": "data/canon.jsonl"
   },
-  "n": 5000,
-  "n_queries": 600,
-  "index": "faiss-ivfpq",
-  "index_mb": 5.42,
-  "build_s": 0.8,
+  "n": 79939,
+  "n_queries": 900,
+  "index": "flat-numpy",
+  "index_mb": 1309.72,
+  "build_s": 12.33,
   "latency_ms": {
-    "p50": 0.09045000115293078,
-    "p95": 0.09689999606052879,
-    "p99": 0.10623599380778612
+    "p50": 31.198300002870383,
+    "p95": 32.226729994727066,
+    "p99": 32.986360000577406
   },
   "metrics": {
-    "recall_at_1": 0.6466666666666666,
-    "recall_at_5": 0.7683333333333333,
-    "recall_at_10": 0.8066666666666666,
-    "mrr_at_10": 0.7002705026455027,
-    "ndcg_at_10": 0.7259576311664548,
+    "recall_at_1": 0.8166666666666667,
+    "recall_at_5": 0.8355555555555556,
+    "recall_at_10": 0.8444444444444444,
+    "mrr_at_10": 0.82611860670194,
+    "ndcg_at_10": 0.8304976346636337,
     "per_category_recall_at_1": {
-      "abbreviation": 0.87,
-      "irrelevant_words": 0.93,
-      "missing_region": 0.32,
-      "misspelling": 0.9,
-      "reorder": 0.84,
+      "abbreviation": 1.0,
+      "irrelevant_words": 0.9733333333333334,
+      "missing_region": 0.98,
+      "misspelling": 0.9333333333333333,
+      "reorder": 0.9933333333333333,
       "transliteration": 0.02
     }
   }

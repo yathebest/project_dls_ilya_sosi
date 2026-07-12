@@ -15,8 +15,9 @@ import time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, ".")
 
+import argparse
 import numpy as np
-from src.data import generate_synthetic
+from src.data import get_canonicals
 from src.noise import make_eval_set
 from src.vectorizer import make_vectorizer
 from src.index import FlatIndex
@@ -72,7 +73,12 @@ def pca_project(doc_vecs, q_vecs, d):
 
 
 def main():
-    canon = generate_synthetic(N)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
+    ap.add_argument("--n", type=int, default=N)
+    args = ap.parse_args()
+
+    canon = get_canonicals(args.n, args.dataset)
     texts = [c["text"] for c in canon]
     vec = make_vectorizer("charngram")
     doc_vecs = vec.fit_transform(texts)
