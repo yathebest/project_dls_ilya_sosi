@@ -85,7 +85,11 @@ function renderMarkers(results){
 
 function renderList(results){
   if(!results.length){ listEl.innerHTML = '<div class="hint">Ничего не найдено.</div>'; return; }
-  listEl.innerHTML = results.map((r,i) =>
+  const best = results[0].score;
+  const warn = (best != null && best < 0.5)
+    ? `<div style="margin:6px 4px;padding:9px 12px;border-radius:8px;border:1px solid #5a4a20;background:rgba(255,191,105,.12);color:#ffcf7a;font-size:13px">⚠ Низкая уверенность (score ${best}). Возможно, этого адреса/города нет в базе (16 городов) — показаны ближайшие похожие.</div>`
+    : '';
+  listEl.innerHTML = warn + results.map((r,i) =>
     `<div class="card" data-i="${i}">
        <div><span class="rank">#${i+1}</span><span class="addr">${escapeHtml(r.address)}</span></div>
        <div class="sub">${escapeHtml(r.region||'')}${r.lat!=null?` · ${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}`:''}</div>
