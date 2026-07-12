@@ -87,16 +87,19 @@ def fig_hybrid():
 def fig_neural():
     ch = load("results_char8k.json")["metrics"]["per_category_recall_at_1"]
     st = load("results_st8k.json")["metrics"]["per_category_recall_at_1"]
+    ft = load("results_st8k_ft.json")["metrics"]["per_category_recall_at_1"]
     cats = sorted(ch)
-    fig, ax = plt.subplots(figsize=(8, 4.2))
-    x = range(len(cats))
-    ax.bar([i - 0.2 for i in x], [ch[c] for c in cats], width=0.4, color=GREY,
+    fig, ax = plt.subplots(figsize=(9, 4.4))
+    x = list(range(len(cats)))
+    ax.bar([i - 0.27 for i in x], [ch[c] for c in cats], 0.27, color=GREY,
            label="char-n-gram")
-    ax.bar([i + 0.2 for i in x], [st[c] for c in cats], width=0.4, color=BLUE,
-           label="neural (e5-small)")
-    ax.set_xticks(list(x)); ax.set_xticklabels(cats, rotation=25, ha="right")
+    ax.bar(x, [st[c] for c in cats], 0.27, color="#8b9bb4",
+           label="e5 off-the-shelf")
+    ax.bar([i + 0.27 for i in x], [ft[c] for c in cats], 0.27, color=BLUE,
+           label="e5 fine-tuned")
+    ax.set_xticks(x); ax.set_xticklabels(cats, rotation=25, ha="right")
     ax.set_ylabel("Recall@1"); ax.legend()
-    ax.set_title("Neural encoder fixes transliteration (real data, 8k)")
+    ax.set_title("Fine-tuned encoder wins across categories (real data, unseen addresses)")
     fig.tight_layout(); fig.savefig("figures/neural_vs_char.png", dpi=160)
     plt.close(fig)
 

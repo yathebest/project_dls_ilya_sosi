@@ -1,84 +1,92 @@
 """Iteration 3 - fine-tune a domain encoder (headline "beyond baseline").
 
-Two objectives, AddrLLM-inspired:
-  (a) CONTRASTIVE  - pull dirty variants to their canonical address, push away
-      others (InfoNCE via in-batch negatives). Needs only text pairs.
-  (b) GEOCODING (optional, AddrLLM Fig.4) - auxiliary head predicting lat/lon so
-      embedding distance ~ geographic distance. Needs <address, lat/lon> pairs.
-  Then DISTILL the fine-tuned model into a tiny fast one (rubert-tiny) for CPU.
+Contrastive fine-tuning (InfoNCE via in-batch negatives, L6/L7): pull a dirty
+address variant to its canonical form, push away others. Pairs are generated
+from the AddrLLM noise taxonomy on REAL OSM addresses.
 
-Run (needs torch + sentence-transformers + a GPU is strongly recommended):
-    pip install sentence-transformers torch
-    python train_encoder.py --base deepvk/USER-bge-m3 --epochs 1
+To show generalization (not "teaching to the test"), training pairs are built
+from addresses OUTSIDE the held-out eval subset (rows >= --holdout).
 
-This trains part (a) on synthetic pairs generated from the same noise taxonomy.
-Part (b) and distillation are wired as documented extensions below.
+    python train_encoder.py --base intfloat/multilingual-e5-small \
+        --dataset data/canon.jsonl --pairs 30000 --epochs 1 --batch 64 \
+        --out models/addr-e5-ft
+    # then compare off-the-shelf vs fine-tuned on the 8k eval subset:
+    python run_baseline.py --embedder st --model intfloat/multilingual-e5-small \
+        --dataset data/canon_8k.jsonl --index hnsw            # baseline
+    python run_baseline.py --embedder st --model models/addr-e5-ft \
+        --dataset data/canon_8k.jsonl --index hnsw            # fine-tuned
+
+Geocoding-aware multi-task head (AddrLLM Fig.4) and distillation to a tiny model
+are wired as documented extensions at the bottom (need coords / a teacher pass).
 """
 import argparse
+import random
 import sys
 
 sys.path.insert(0, ".")
-from src.data import generate_synthetic, canonical_string
+from src.data import load_canon, generate_synthetic
 from src.noise import CATEGORIES, make_dirty
-import random
 
 
-def build_pairs(n=20000, seed=20260605):
+def build_pairs(canon, n, q_prefix, d_prefix, seed=20260605):
     """(dirty, canonical) positive pairs for contrastive fine-tuning."""
     rng = random.Random(seed)
-    canon = generate_synthetic(n)
+    sample = canon if len(canon) <= n else rng.sample(canon, n)
     pairs = []
-    for c in canon:
+    for c in sample:
         cat = rng.choice(CATEGORIES)
-        pairs.append((make_dirty(c, cat, rng), c["text"]))
-    return pairs, canon
-
-
-def train_contrastive(base, epochs, out_dir):
-    from sentence_transformers import (SentenceTransformer, InputExample,
-                                       losses)
-    from torch.utils.data import DataLoader
-
-    pairs, _ = build_pairs()
-    examples = [InputExample(texts=[q, d]) for q, d in pairs]
-    model = SentenceTransformer(base)
-    loader = DataLoader(examples, shuffle=True, batch_size=64)
-    # MultipleNegativesRankingLoss = InfoNCE with in-batch negatives (L6/L7)
-    loss = losses.MultipleNegativesRankingLoss(model)
-    model.fit(train_objectives=[(loader, loss)], epochs=epochs,
-              warmup_steps=100, show_progress_bar=True)
-    model.save(out_dir)
-    print(f"saved fine-tuned model -> {out_dir}")
-    return out_dir
-
-
-# ---------------------------------------------------------------------------
-# Extension (b): geocoding-aware multi-task head  (needs coordinates)
-# ---------------------------------------------------------------------------
-# Attach an FC head on top of the pooled embedding that regresses (lat, lon):
-#     h = encoder(address)            # [B, 768]
-#     coord = FC(h)                   # [B, 2]
-#     loss = contrastive(h) + λ * MSE(coord, true_latlon)
-# Data: join GAR addresses with OpenAddresses / OSM / Nominatim to get
-# <address, lat, lon>. After training, plot embedding-distance vs geo-distance
-# and report R^2 / t-SNE station separation, as in AddrLLM Fig.3-4.
-#
-# Extension (c): distillation to a tiny fast student (L7)
-# Teacher = fine-tuned model above; student = sergeyzh/rubert-tiny-retriever.
-# Use sentence_transformers.losses.MSELoss on teacher vs student embeddings,
-# or margin-MSE on (query, pos, neg) score gaps. Result: CPU-servable encoder.
-# ---------------------------------------------------------------------------
+        pairs.append((q_prefix + make_dirty(c, cat, rng), d_prefix + c["text"]))
+    return pairs
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="deepvk/USER-bge-m3")
+    ap.add_argument("--base", default="intfloat/multilingual-e5-small")
+    ap.add_argument("--dataset", default=None, help="real jsonl base (else synthetic)")
+    ap.add_argument("--pairs", type=int, default=30000)
     ap.add_argument("--epochs", type=int, default=1)
-    ap.add_argument("--out", default="models/addr-encoder")
+    ap.add_argument("--batch", type=int, default=64)
+    ap.add_argument("--holdout", type=int, default=8000,
+                    help="first N rows are the eval subset -> excluded from training")
+    ap.add_argument("--out", default="models/addr-e5-ft")
     args = ap.parse_args()
-    train_contrastive(args.base, args.epochs, args.out)
-    print("Next: evaluate with  python run_baseline.py --embedder st --model", args.out)
 
+    import torch
+    from sentence_transformers import SentenceTransformer, InputExample, losses
+    from torch.utils.data import DataLoader
+
+    torch.manual_seed(20260605)
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+
+    canon = load_canon(args.dataset) if args.dataset else generate_synthetic(args.pairs + args.holdout)
+    train_pool = canon[args.holdout:] or canon        # unseen addresses
+    print(f"base={args.base} device={dev} | canon={len(canon)} train_pool={len(train_pool)}")
+
+    # e5 models expect "query:" / "passage:" prefixes; keep them consistent with eval
+    e5 = "e5" in args.base.lower()
+    qp, dp = ("query: ", "passage: ") if e5 else ("", "")
+    pairs = build_pairs(train_pool, args.pairs, qp, dp)
+    print(f"training pairs: {len(pairs)}  (e.g. {pairs[0][0]!r} -> {pairs[0][1]!r})")
+
+    model = SentenceTransformer(args.base, device=dev)
+    model.max_seq_length = 64                          # addresses are short -> fast
+    loader = DataLoader([InputExample(texts=[q, d]) for q, d in pairs],
+                        shuffle=True, batch_size=args.batch)
+    loss = losses.MultipleNegativesRankingLoss(model)  # InfoNCE, in-batch negatives
+    model.fit(train_objectives=[(loader, loss)], epochs=args.epochs,
+              warmup_steps=int(0.1 * len(loader)), show_progress_bar=True)
+    model.save(args.out)
+    print(f"saved fine-tuned model -> {args.out}")
+
+
+# --- Extension (b): geocoding-aware head (needs coords, in our OSM base) ---------
+# Multi-task: loss = contrastive + λ·MSE(FC(embedding), (lat,lon)). Attach a small
+# nn.Linear(dim, 2) head; train with a custom loop mixing MultipleNegativesRanking
+# and coordinate MSE. Afterwards plot embedding-distance vs geo-distance (R^2) and
+# t-SNE by city, as in AddrLLM Fig.3-4.
+# --- Extension (c): distillation -> sergeyzh/rubert-tiny-retriever (L7) -----------
+# Teacher = model above; student = tiny; losses.MSELoss on teacher/student
+# embeddings for CPU-servable inference.
 
 if __name__ == "__main__":
     main()

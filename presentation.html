@@ -113,10 +113,12 @@ QUERY (онлайн, &lt;100 мс):
 
 <section class="slide">
   <div class="num">8</div>
-  <div class="q">Результаты — главный выигрыш</div>
-  <h2>Нейро-энкодер чинит транслитерацию</h2>
-  <img src="figures/neural_vs_char.png" alt="neural vs char">
-  <p><span class="big">transliteration: 0.04 → 0.67</span> · R@1 0.82→0.86 · Acc@500m 0.83→0.92 · вектор <strong>384-d</strong> (меньше char-n-gram 4096) и быстрее.</p>
+  <div class="q">Результаты — главный выигрыш (Итерация 3)</div>
+  <h2>Дообученный энкодер бьёт off-the-shelf</h2>
+  <img src="figures/neural_vs_char.png" alt="char vs off-the-shelf vs fine-tuned">
+  <p><span class="big">char-n-gram → off-the-shelf → дообученный</span></p>
+  <p>R@1 <strong>0.81 → 0.86 → 0.95</strong> · transliteration <strong>0.04 → 0.67 → 0.88</strong> · nDCG <strong>0.83 → 0.90 → 0.97</strong> · Acc@500m <strong>0.83 → 0.92 → 0.98</strong></p>
+  <p style="color:var(--muted)">Контрастив (InfoNCE) на парах «грязный↔канон»; обучен на <em>невиданных</em> адресах (строки 8000+), eval — на других. 30k пар, 2 мин на GPU.</p>
 </section>
 
 <section class="slide">
@@ -136,7 +138,7 @@ QUERY (онлайн, &lt;100 мс):
   <div class="num">10</div>
   <div class="q">Вопрос 5 — что эффективнее и почему</div>
   <h2>Рекомендуемая архитектура</h2>
-  <div class="flow">нейро multilingual-энкодер → HNSW  (основа: R@1 0.88, 384-d, p50 0.02 мс)
+  <div class="flow">ДООБУЧЕННЫЙ энкодер → HNSW      (основа: R@1 0.95, 384-d, p50 0.02 мс)
    + int8/PQ + exact re-rank      (память ×4–30 без потери качества)
    + нейро cross-encoder реранк   (только на shortlist, где помогает)</div>
   <ul>
@@ -175,8 +177,8 @@ QUERY (онлайн, &lt;100 мс):
   <div class="q">Итог</div>
   <h2>Что сделано и что дальше</h2>
   <ul>
-    <li><strong>Сделано:</strong> реальные данные OSM <strong>623k / 14 регионов</strong> (+координаты), 3 итерации, нейро-энкодер (транслит 0.04→0.67), Pareto индексов/квантизации, гибрид+реранк, гео-метрика, сервис (FastAPI+UI), воспроизводимо, в git.</li>
-    <li><strong>Дальше:</strong> дообучение энкодера + geo-голова (GPU), нейро cross-encoder реранк, замер на полной базе 623k.</li>
+    <li><strong>Сделано:</strong> реальные данные OSM <strong>623k / 14 регионов</strong> (+координаты), 3 итерации, <strong>дообученный энкодер (R@1 0.95, транслит 0.04→0.88)</strong>, Pareto индексов/квантизации, гибрид+реранк, гео-метрика, сервис (FastAPI+UI), воспроизводимо, в git.</li>
+    <li><strong>Дальше:</strong> geo-голова (координаты в базе есть), дистилляция в tiny для CPU, замер дообученной модели на полной базе 623k.</li>
   </ul>
   <p style="color:var(--muted)">Репозиторий: github.com/yathebest/project_dlc · демо: <code>uvicorn service.app:app</code></p>
 </section>

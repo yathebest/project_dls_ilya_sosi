@@ -4,7 +4,7 @@ numpy>=1.24
 # Neural iterations (2/3) and service — install when scaling up:
 # sentence-transformers>=3.0      # USER-bge-m3 / multilingual-e5 encoders
 # faiss-cpu>=1.8                    # HNSW / IVF-PQ indexes (faiss-gpu if CUDA)
-# torch>=2.2                        # fine-tuning + distillation
+# torch>=2.2  datasets  accelerate   # fine-tuning (train_encoder.py); GPU recommended
 # qdrant-client>=1.9               # vector DB service for the demo
 # fastapi>=0.110  uvicorn          # REST API + mini UI
 # lxml                              # GAR XML parsing

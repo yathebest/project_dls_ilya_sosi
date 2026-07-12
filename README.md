@@ -62,9 +62,12 @@ quality runs below use CPU-feasible 8k/80k subsets of this base.
   (×110 faster) → IVF-PQ 0.54 / **10 MB** (×130 smaller); add exact re-rank to
   recover IVF-PQ recall (L9).
 - **Iter 1 shrink** (method): int8 ≈free ×4 · PCA-256 ×16 · binary ×32.
-- **Iter 3 neural encoder** (multilingual-e5-small, 8k, HNSW): R@1 **0.86**,
-  R@5 **0.93**, **Acc@500m 0.92**, **transliteration 0.04 → 0.67**, only 384-dim
-  (smaller than char-n-gram) and p50 0.02 ms. **Biggest single win.**
+- **Iter 3a neural encoder** (multilingual-e5-small off-the-shelf, 8k, HNSW):
+  R@1 **0.86**, R@5 **0.93**, Acc@500m 0.92, **transliteration 0.04 → 0.67**, 384-dim.
+- **Iter 3b fine-tuned encoder** (contrastive on dirty↔canonical, e5-small, GPU
+  ~2 min, evaluated on **unseen** addresses): R@1 **0.95**, R@5 **0.99**, nDCG
+  **0.97**, Acc@500m **0.98**, **transliteration 0.88** — beats off-the-shelf in
+  every category. **Headline result** (`python train_encoder.py`).
 - **Hybrid caveat (real finding):** neural dense alone (R@1 **0.88**) *beats* naive
   neural+BM25 RRF (0.83) here — when one retriever dominates, fusing a weaker one
   adds noise (L8); and the *lexical* reranker hurts transliteration (0.62→0.10),
