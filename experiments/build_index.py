@@ -52,7 +52,11 @@ def main():
             f.write(json.dumps({"id": c["id"], "text": c["text"],
                                 "region": c.get("region"), "city": c.get("city"),
                                 "lat": c.get("lat"), "lon": c.get("lon"),
-                                "osm_id": c.get("osm_id")}, ensure_ascii=False) + "\n")
+                                "osm_id": c.get("osm_id"),
+                                "fias_guid": c.get("fias_guid"),
+                                "postal": c.get("postal"),
+                                "region_code": c.get("region_code")},
+                               ensure_ascii=False) + "\n")
 
     index = faiss.IndexHNSWFlat(vecs.shape[1], 32, faiss.METRIC_INNER_PRODUCT)
     index.hnsw.efConstruction = 200

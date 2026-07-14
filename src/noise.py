@@ -59,7 +59,7 @@ def _typo(token, rng):
 
 
 def transliterate(text):
-    return "".join(TRANSLIT.get(ch, ch) for ch in text.lower())
+    return "".join(TRANSLIT.get(ch, ch) for ch in (text or "").lower())
 
 
 def make_dirty(comp, category, rng):
@@ -68,19 +68,24 @@ def make_dirty(comp, category, rng):
     comp: dict(region, city, street, house, korp)
     returns: dirty string
     """
-    region = comp["region"]
-    city = comp["city"]
-    street = comp["street"]
-    house = comp["house"]
+    region = comp.get("region")
+    city = comp.get("city")
+    street = comp.get("street")
+    house = comp.get("house")
     korp = comp.get("korp")
 
     def canon(reg=True):
+        # None-safe: real FIAS rows may lack a city (rural) or a street (house
+        # hangs directly under a settlement), so only emit the parts we have.
         parts = []
-        if reg:
+        if reg and region:
             parts.append(region)
-        parts.append(f"г {city}")
-        parts.append(f"ул {street}")
-        parts.append(f"д {house}")
+        if city:
+            parts.append(f"г {city}")
+        if street:
+            parts.append(f"ул {street}")
+        if house:
+            parts.append(f"д {house}")
         if korp:
             parts.append(f"к {korp}")
         return ", ".join(parts)
@@ -104,7 +109,10 @@ def make_dirty(comp, category, rng):
         return s
 
     if category == "missing_region":
-        return canon(reg=False) if rng.random() < 0.5 else f"г {city}, {street} {house}"
+        if rng.random() < 0.5:
+            return canon(reg=False)
+        loc = " ".join(p for p in [street, house] if p) or house or ""
+        return ", ".join(p for p in [f"г {city}" if city else "", loc] if p)
 
     if category == "irrelevant_words":
         s = canon()
@@ -123,7 +131,11 @@ def make_dirty(comp, category, rng):
         return s
 
     if category == "transliteration":
-        return f"{city}, ul {transliterate(street)} {house}"
+        target = street or city                       # transliterate whatever name exists
+        if not target:
+            return canon()
+        head = f"{city}, " if (street and city) else ""
+        return f"{head}ul {transliterate(target)} {house}"
 
     raise ValueError(category)
 

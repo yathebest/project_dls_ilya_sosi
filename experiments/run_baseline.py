@@ -106,9 +106,9 @@ def main():
                            "p95": float(np.percentile(lat, 95)),
                            "p99": float(np.percentile(lat, 99))},
                metrics=m)
-    with open("results_baseline.json", "w", encoding="utf-8") as f:
+    with open("results/baseline.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print("\nsaved -> results_baseline.json")
+    print("\nsaved -> results/baseline.json")
 
 
 if __name__ == "__main__":

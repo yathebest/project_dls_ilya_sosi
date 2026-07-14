@@ -7,46 +7,51 @@ structure). Framed as **retrieval / matching** (not LLM rewriting). The retrieve
 design and evaluation follow **AddrLLM** (JD Logistics, arXiv 2411.13584); we
 scale down to the vector-search core that this course grades.
 
-## Runs offline right now
+## Project layout
 
-```bash
-pip install numpy            # baseline needs only numpy
-python run_baseline.py       # Iteration 0: encode → index → dirty queries → metrics
-python run_experiments.py    # Iteration 1: Flat vs HNSW vs IVF-PQ (Pareto)
+```
+src/            core library — importable modules (no CLI). Run scripts from the repo root.
+  fias.py         GAR/FIAS XML → canonical records + OBJECTGUID (streaming, reads gar_xml.zip directly)
+  matching.py     address-key normalization for the FIAS↔OSM coordinate join
+  data.py         canonical base: synthetic generator + parse_gar entry point
+  noise.py        dirty-query generator (AddrLLM error taxonomy)
+  vectorizer.py   char-n-gram / sentence-transformers encoders
+  index.py        numpy Flat + FAISS Flat/HNSW/IVF-PQ
+  lexical.py      word-level BM25    ·    hybrid.py   RRF fusion + rerank
+  metrics.py      Recall@k, MRR, nDCG, per-category robustness, geo Acc@radius
+  osm.py osm_pbf.py   OSM address loaders (Overpass / Geofabrik .pbf)
+pipeline/       FIAS production pipeline (the deployed system)
+  build_dataset_fias.py   GAR zip → data/canon_fias.jsonl (region/city/street/house + GUID + postal)
+  train_encoder.py        fine-tune the e5 encoder → models/addr-e5-ft
+  build_index_pq.py       stream-encode → FAISS IVF-PQ + SQLite metadata
+  join_coords.py patch_coords.py   attach OSM coordinates to the base / a built index (no re-encode)
+  append_objects.py       add street/city OBJECTS to an existing index
+  eval_index.py           ablation / evaluation of the live index
+  download_pbf.py         fetch a Geofabrik .osm.pbf
+experiments/    earlier course iterations (synthetic / small OSM, comparative studies)
+  run_baseline.py (Iter 0) · run_experiments.py (Iter 1: Flat/HNSW/IVF-PQ)
+  run_shrink.py (quantization) · run_hybrid.py (Iter 2: dense+BM25+rerank)
+  build_dataset.py (OSM Overpass) · build_index.py (HNSW) · make_plots.py (figures)
+service/        FastAPI demo + Yandex-map UI (app.py, index.html)
+tests/          offline unit tests (no downloads)
+results/        eval metric outputs (json)   ·   figures/   plots   ·   docs/   presentation
+data/ models/ index_ru/    build artifacts (gitignored)
 ```
 
-No downloads: uses a deterministic **synthetic** RU address base + a char-n-gram
-encoder, so the whole pipeline works end-to-end. Swap in real GAR + a neural
-encoder for the full run (below).
+## Quick start
 
-## What's here
+```bash
+# 1. offline baseline — numpy only, deterministic synthetic data, no downloads
+pip install numpy
+python experiments/run_baseline.py      # Iter 0: encode → index → dirty queries → metrics
+python experiments/run_experiments.py   # Iter 1: Flat vs HNSW vs IVF-PQ (Pareto)
 
-| File | Role | Element (assignment) |
-|---|---|---|
-| `src/data.py` | canonical base (synthetic; `parse_gar` stub for real run) | data |
-| `src/noise.py` | synthetic dirty-query generator, AddrLLM error taxonomy | validation set |
-| `src/vectorizer.py` | char-n-gram (default) / sentence-transformers | 1. model |
-| `src/index.py` | numpy Flat + FAISS Flat/HNSW/IVF-PQ | 2. DB + 3. index |
-| `src/lexical.py` | word-level BM25 (sparse) | 4. search |
-| `src/hybrid.py` | RRF fusion + precise / cross-encoder rerank | 4. search |
-| `src/metrics.py` | Recall@k, MRR, nDCG, per-category robustness (by hand) | evaluation |
-| `run_baseline.py` | **Iter 0** — end-to-end baseline | 4. search |
-| `run_experiments.py` | **Iter 1** — Flat vs HNSW vs IVF-PQ | comparative study |
-| `run_shrink.py` | **Iter 1** — quantization (int8/binary) + PCA | shrink/quantize |
-| `run_hybrid.py` | **Iter 2** — dense+bm25 (RRF) + rerank | comparative study |
-| `train_encoder.py` | **Iter 3** — contrastive + geocoding fine-tune, distill | 1. model |
-| `make_plots.py` | figures for the presentation | comparative study |
-| `service/app.py` + `index.html` | FastAPI demo + mini UI | deployment |
+# 2. live FIAS demo (needs models/addr-e5-ft + index_ru/ — see the FIAS section below)
+python -m uvicorn service.app:app       # http://127.0.0.1:8000
+```
 
 **Noise categories** (AddrLLM Table 5, adapted to RU): misspelling, abbreviation,
 missing_region, irrelevant_words, reorder, transliteration.
-
-Run everything:
-```bash
-python run_baseline.py && python run_experiments.py && python run_shrink.py
-python run_hybrid.py  && python make_plots.py        # -> figures/*.png
-uvicorn service.app:app                              # demo at http://127.0.0.1:8000
-```
 
 ## Web demo (search UI + Yandex map)
 
@@ -54,7 +59,7 @@ Type a dirty address → canonical candidates pinned on a Yandex map (coordinate
 come from the OSM base). Uses the fine-tuned encoder + a prebuilt HNSW index.
 
 ```bash
-python build_index.py --limit 0                 # embed the base once (GPU); index/ (gitignored)
+python experiments/build_index.py --limit 0                 # embed the base once (GPU); index/ (gitignored)
 set YANDEX_MAPS_API_KEY=<your Yandex JS API key> # same env style as ortouz (VITE_YANDEX_MAPS_API_KEY)
 pip install fastapi "uvicorn[standard]"
 uvicorn service.app:app                          # open http://127.0.0.1:8000
@@ -86,7 +91,7 @@ quality runs below use CPU-feasible 8k/80k subsets of this base.
 - **Iter 3b fine-tuned encoder** (contrastive on dirty↔canonical, e5-small, GPU
   ~2 min, evaluated on **unseen** addresses): R@1 **0.95**, R@5 **0.99**, nDCG
   **0.97**, Acc@500m **0.98**, **transliteration 0.88** — beats off-the-shelf in
-  every category. **Headline result** (`python train_encoder.py`).
+  every category. **Headline result** (`python pipeline/train_encoder.py`).
 - **Hybrid caveat (real finding):** neural dense alone (R@1 **0.88**) *beats* naive
   neural+BM25 RRF (0.83) here — when one retriever dominates, fusing a weaker one
   adds noise (L8); and the *lexical* reranker hurts transliteration (0.62→0.10),
@@ -99,10 +104,10 @@ quality runs below use CPU-feasible 8k/80k subsets of this base.
 Overpass API and writes `data/canon.jsonl`; every run script takes `--dataset`:
 
 ```bash
-python build_dataset.py                                  # default city list
-python build_dataset.py --cities "Казань:Республика Татарстан,Уфа:Республика Башкортостан"
-python run_baseline.py --dataset data/canon.jsonl        # Acc@300m/500m too (coords)
-python run_hybrid.py   --dataset data/canon.jsonl
+python experiments/build_dataset.py                                  # default city list
+python experiments/build_dataset.py --cities "Казань:Республика Татарстан,Уфа:Республика Башкортостан"
+python experiments/run_baseline.py --dataset data/canon.jsonl        # Acc@300m/500m too (coords)
+python experiments/run_hybrid.py   --dataset data/canon.jsonl
 ```
 
 Coordinates come for free → they feed the geocoding-aware head (Iter 3). For the
@@ -110,9 +115,64 @@ full **≥500k**, add more/larger regions, or read a Geofabrik `.osm.pbf` via
 `src.osm.load_pbf` (GDAL/geopandas). For the official FIAS id instead of OSM,
 implement `data.parse_gar()` (gar_xml.zip from fias.nalog.ru).
 
+## FIAS/GAR as the canonical source (official state registry)
+
+The headline framing of the task — "dirty text → **canonical record**" — is strongest
+when the canonical record is an **official** one. OSM is convenient and carries
+coordinates, but it is crowd-sourced and *structurally incomplete*: on our 11.13M
+national base only **41.7%** of rows have a city and **2.3%** a region (OSM leans on
+boundary relations instead of `addr:*` tags). That makes many OSM rows ambiguous
+country-wide (just street + house).
+
+**GAR** (ГАР, ФНС — the successor to ФИАС, `fias.nalog.ru`) fixes exactly this: every
+object carries the full hierarchy **region → district → city → street → house** and an
+official **`OBJECTGUID`**. That GUID *is* the canonical target (as in AddrLLM), so a
+match becomes "normalized into state-registry object `<guid>`" — a real plus for the
+grade.
+
+**The one catch:** GAR has **no coordinates** for houses, but the map needs lat/lon.
+So we do a **hybrid**: canon + GUID come from FIAS, coordinates are joined from the
+existing OSM base by a normalized `(city, street, house)` key
+([`src/matching.py`](src/matching.py)). Rows without an OSM match stay searchable, just
+without a map pin (graceful degradation) — high match-rate in cities, low in villages.
+
+```bash
+# 1. read the base straight from gar_xml.zip — NO unzip needed (full unzip = 424 GB;
+#    the parser streams the 3 needed files per region out of the archive)
+python pipeline/build_dataset_fias.py --gar D:/gar_xml.zip --regions 46,16,77,78,66 --postal
+#    -> data/canon_fias.jsonl  (region+city on ~every row, + fias_guid + postal index)
+python pipeline/join_coords.py --fias data/canon_fias.jsonl --osm data/canon_ru.jsonl \
+       --out data/canon_fias_geo.jsonl        # attach lat/lon from OSM
+# 2. index + serve — unchanged infrastructure
+python pipeline/build_index_pq.py --dataset data/canon_fias_geo.jsonl --out index_ru
+uvicorn service.app:app                        # /search returns fias_guid + postal
+```
+
+Record schema (jsonl): `{region, city, street, house, korp, region_code, postal,
+fias_guid, lat, lon, text}`. The canonical `text` uses real GAR types —
+`влд./д./двлд./стр./к.` for houses, `обл./г./ул./пгт/с.` for objects, e.g.
+`305000, Курская обл., г. Курск, ул. Ленина, д. 5, к. 1`. `--postal` joins the
+index from `AS_HOUSES_PARAMS` (a large per-region file, so it is opt-in); the index
+is a strong disambiguator and is often present in dirty user queries.
+
+`src/fias.py` streams the GAR XML with `iterparse` (lxml, stdlib fallback) so peak RAM
+is ~one region, not the whole country: it reads `AS_ADDR_OBJ` (objects: NAME/TYPENAME/
+LEVEL), reconstructs ancestry from `AS_ADM_HIERARCHY` (`PATH`), and emits one canonical
+row per **actual** house in `AS_HOUSES`. Only `ISACTUAL=1 AND ISACTIVE=1` records are
+kept. Offline sanity check (no download, no lxml required): `python tests/test_fias.py`.
+
+**FIAS vs OSM (why both):**
+
+| | OSM | FIAS/GAR |
+|---|---|---|
+| region on row | 2.3% | ~100% |
+| city on row | 41.7% | ~100% |
+| official id | — | `OBJECTGUID` |
+| coordinates | ✅ | ❌ (joined from OSM) |
+
 ## Scaling up (neural)
 2. **Neural encoder (Iter 2/3):**
-   `python run_baseline.py --embedder st --model deepvk/USER-bge-m3 --index hnsw`
+   `python experiments/run_baseline.py --embedder st --model deepvk/USER-bge-m3 --index hnsw`
 3. **Hybrid + rerank (Iter 2):** fuse dense + char-n-gram via RRF, then a
    cross-encoder on the top-k.
 4. **Fine-tune (Iter 3, headline):** contrastive on (dirty↔canonical) pairs with

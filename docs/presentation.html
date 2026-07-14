@@ -107,7 +107,7 @@ QUERY (онлайн, &lt;100 мс):
   <div class="num">7</div>
   <div class="q">Результаты — эффективность индекса (реальные 80k)</div>
   <h2>Pareto: recall ↔ скорость ↔ память</h2>
-  <img src="figures/index_compare.png" alt="index comparison">
+  <img src="../figures/index_compare.png" alt="index comparison">
   <p>Flat 0.82 / 1310 МБ / 31 мс → <strong>HNSW</strong> 0.74 / <strong>0.28 мс</strong> (×110) → <strong>IVF-PQ</strong> 0.54 / <strong>10 МБ</strong> (×130). IVF-PQ требует exact re-rank для восстановления recall (урок L9).</p>
 </section>
 
@@ -115,7 +115,7 @@ QUERY (онлайн, &lt;100 мс):
   <div class="num">8</div>
   <div class="q">Результаты — главный выигрыш (Итерация 3)</div>
   <h2>Дообученный энкодер бьёт off-the-shelf</h2>
-  <img src="figures/neural_vs_char.png" alt="char vs off-the-shelf vs fine-tuned">
+  <img src="../figures/neural_vs_char.png" alt="char vs off-the-shelf vs fine-tuned">
   <p><span class="big">char-n-gram → off-the-shelf → дообученный</span></p>
   <p>R@1 <strong>0.81 → 0.86 → 0.95</strong> · transliteration <strong>0.04 → 0.67 → 0.88</strong> · nDCG <strong>0.83 → 0.90 → 0.97</strong> · Acc@500m <strong>0.83 → 0.92 → 0.98</strong></p>
   <p style="color:var(--muted)">Контрастив (InfoNCE) на парах «грязный↔канон»; обучен на <em>невиданных</em> адресах (строки 8000+), eval — на других. 30k пар, 2 мин на GPU.</p>

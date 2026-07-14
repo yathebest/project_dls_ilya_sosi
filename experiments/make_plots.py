@@ -22,7 +22,7 @@ def load(path):
 
 
 def fig_shrink():
-    rows = load("results_shrink.json")
+    rows = load("results/shrink.json")
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for r in rows:
         ax.scatter(r["memory_mb"], r["recall_at_1"], s=70,
@@ -39,7 +39,7 @@ def fig_shrink():
 
 
 def fig_index():
-    rows = load("results_experiments.json")
+    rows = load("results/experiments.json")
     names = [r["index"] for r in rows]
     fig, ax = plt.subplots(figsize=(7, 4.2))
     ax2 = ax.twinx()
@@ -56,7 +56,7 @@ def fig_index():
 
 
 def fig_hybrid():
-    out = load("results_hybrid.json")
+    out = load("results/hybrid.json")
     systems = list(out)
     fig, ax = plt.subplots(figsize=(7, 4.2))
     ax.bar(systems, [out[s]["metrics"]["recall_at_1"] for s in systems],
@@ -85,9 +85,9 @@ def fig_hybrid():
 
 
 def fig_neural():
-    ch = load("results_char8k.json")["metrics"]["per_category_recall_at_1"]
-    st = load("results_st8k.json")["metrics"]["per_category_recall_at_1"]
-    ft = load("results_st8k_ft.json")["metrics"]["per_category_recall_at_1"]
+    ch = load("results/char8k.json")["metrics"]["per_category_recall_at_1"]
+    st = load("results/st8k.json")["metrics"]["per_category_recall_at_1"]
+    ft = load("results/st8k_ft.json")["metrics"]["per_category_recall_at_1"]
     cats = sorted(ch)
     fig, ax = plt.subplots(figsize=(9, 4.4))
     x = list(range(len(cats)))

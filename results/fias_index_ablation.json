@@ -1,0 +1,78 @@
+{
+  "dense (baseline)": {
+    "metrics": {
+      "recall_at_1": 0.9361111111111111,
+      "recall_at_5": 0.9805555555555555,
+      "recall_at_10": 0.9805555555555555,
+      "mrr_at_10": 0.9537500000000001,
+      "ndcg_at_10": 0.9604711187831114,
+      "per_category_recall_at_1": {
+        "abbreviation": 0.9833333333333333,
+        "irrelevant_words": 1.0,
+        "missing_region": 0.95,
+        "misspelling": 0.8333333333333334,
+        "reorder": 1.0,
+        "transliteration": 0.85
+      }
+    },
+    "p50_ms": 144.6,
+    "p95_ms": 161.2
+  },
+  "+ case/punct norm": {
+    "metrics": {
+      "recall_at_1": 0.9166666666666666,
+      "recall_at_5": 0.9722222222222222,
+      "recall_at_10": 0.9777777777777777,
+      "mrr_at_10": 0.9405092592592592,
+      "ndcg_at_10": 0.9497800311911829,
+      "per_category_recall_at_1": {
+        "abbreviation": 0.9666666666666667,
+        "irrelevant_words": 0.9666666666666667,
+        "missing_region": 0.95,
+        "misspelling": 0.8166666666666667,
+        "reorder": 1.0,
+        "transliteration": 0.8
+      }
+    },
+    "p50_ms": 129.5,
+    "p95_ms": 145.9
+  },
+  "+ number boost": {
+    "metrics": {
+      "recall_at_1": 0.9361111111111111,
+      "recall_at_5": 0.9805555555555555,
+      "recall_at_10": 0.9805555555555555,
+      "mrr_at_10": 0.9540277777777777,
+      "ndcg_at_10": 0.9607145840655495,
+      "per_category_recall_at_1": {
+        "abbreviation": 0.9833333333333333,
+        "irrelevant_words": 1.0,
+        "missing_region": 0.95,
+        "misspelling": 0.8333333333333334,
+        "reorder": 1.0,
+        "transliteration": 0.85
+      }
+    },
+    "p50_ms": 125.3,
+    "p95_ms": 138.8
+  },
+  "full (norm+boost)": {
+    "metrics": {
+      "recall_at_1": 0.9166666666666666,
+      "recall_at_5": 0.9722222222222222,
+      "recall_at_10": 0.9777777777777777,
+      "mrr_at_10": 0.940787037037037,
+      "ndcg_at_10": 0.9500234964736212,
+      "per_category_recall_at_1": {
+        "abbreviation": 0.9666666666666667,
+        "irrelevant_words": 0.9666666666666667,
+        "missing_region": 0.95,
+        "misspelling": 0.8166666666666667,
+        "reorder": 1.0,
+        "transliteration": 0.8
+      }
+    },
+    "p50_ms": 125.0,
+    "p95_ms": 138.8
+  }
+}

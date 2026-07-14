@@ -94,17 +94,14 @@ def generate_synthetic(n, seed=20260605):
 
 
 def parse_gar(xml_dir, region_codes=None, limit=None):
-    """STUB for the real run. Parse GAR gar_xml.zip -> canonical dicts.
+    """Parse the official GAR / FIAS XML into canonical dicts.
 
     GAR ships AS_ADDR_OBJ (settlements/streets) and AS_HOUSES (houses) as XML per
-    region. Join by OBJECTID/parent to rebuild the hierarchy region->city->street
-    ->house, then build canonical_string(). Keep OBJECTGUID as the FIAS id and
-    region/level as metadata for filtering.
+    region, joined via AS_ADM_HIERARCHY (PATH). We rebuild region->city->street
+    ->house, keep OBJECTGUID as the FIAS id, and build the canonical text.
 
-    Recommended: parse only the needed regions and only ADDR_OBJ levels + HOUSES
-    to stay under memory. Return the same schema as generate_synthetic().
+    Implemented (streaming) in src/fias.py. For millions of houses use
+    fias.iter_canon(...) + build_dataset_fias.py instead of this list form.
     """
-    raise NotImplementedError(
-        "Plug in GAR XML parsing here. Download gar_xml.zip from fias.nalog.ru, "
-        "or use a preconverted dump (Kaggle/HF). Return dicts with keys: "
-        "id, region, city, street, house, korp, text.")
+    from src.fias import parse_gar as _parse_gar
+    return _parse_gar(xml_dir, region_codes=region_codes, limit=limit)

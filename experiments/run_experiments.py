@@ -79,9 +79,9 @@ def main():
               f"{m['mrr_at_10']:9.3f}{row['memory_mb']:9.1f}"
               f"{row['p50_ms']:9.3f}{row['p99_ms']:9.3f}")
 
-    with open("results_experiments.json", "w", encoding="utf-8") as f:
+    with open("results/experiments.json", "w", encoding="utf-8") as f:
         json.dump(rows, f, ensure_ascii=False, indent=2)
-    print("\nsaved -> results_experiments.json")
+    print("\nsaved -> results/experiments.json")
     print("Note: IVF-PQ trades recall for ~15x smaller memory; add exact re-rank "
           "of the shortlist to recover recall (L9).")
 

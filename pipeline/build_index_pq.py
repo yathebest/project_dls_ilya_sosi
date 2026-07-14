@@ -122,7 +122,8 @@ def main():
     db.execute("PRAGMA journal_mode=OFF")
     db.execute("PRAGMA synchronous=OFF")
     db.execute("CREATE TABLE addr(rowid INTEGER PRIMARY KEY, text TEXT, "
-               "region TEXT, city TEXT, lat REAL, lon REAL)")
+               "region TEXT, city TEXT, lat REAL, lon REAL, fias_guid TEXT, "
+               "postal TEXT, region_code TEXT)")
 
     # --- streaming encode + add --------------------------------------------
     print("encoding + adding in chunks...")
@@ -134,9 +135,11 @@ def main():
         vecs = encode([r.get("text") or "" for r in buf])
         index.add(vecs)
         db.executemany(
-            "INSERT INTO addr(rowid,text,region,city,lat,lon) VALUES(?,?,?,?,?,?)",
+            "INSERT INTO addr(rowid,text,region,city,lat,lon,fias_guid,"
+            "postal,region_code) VALUES(?,?,?,?,?,?,?,?,?)",
             [(pos + i, r.get("text"), r.get("region"), r.get("city"),
-              r.get("lat"), r.get("lon")) for i, r in enumerate(buf)])
+              r.get("lat"), r.get("lon"), r.get("fias_guid"),
+              r.get("postal"), r.get("region_code")) for i, r in enumerate(buf)])
         pos += len(buf)
         buf.clear()
         if pos % (args.chunk * 5) == 0 or pos >= total:

@@ -1,0 +1,36 @@
+{
+  "config": {
+    "n": 5000,
+    "per_category": 200,
+    "embedder": "st",
+    "model": "models/addr-e5-ft",
+    "index": "hnsw",
+    "seed": 20260605,
+    "dataset": "data/canon_fias_eval.jsonl"
+  },
+  "n": 7984,
+  "n_queries": 1200,
+  "index": "faiss-hnsw",
+  "index_mb": 14.43,
+  "build_s": 3.72,
+  "latency_ms": {
+    "p50": 0.05390000296756625,
+    "p95": 0.0864249901496805,
+    "p99": 0.13834800454787896
+  },
+  "metrics": {
+    "recall_at_1": 1.0,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0,
+    "mrr_at_10": 1.0,
+    "ndcg_at_10": 1.0,
+    "per_category_recall_at_1": {
+      "abbreviation": 1.0,
+      "irrelevant_words": 1.0,
+      "missing_region": 1.0,
+      "misspelling": 1.0,
+      "reorder": 1.0,
+      "transliteration": 1.0
+    }
+  }
+}

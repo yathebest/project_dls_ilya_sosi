@@ -97,9 +97,9 @@ def main():
         print(f"{c:18s}" + "".join(
             f"{out[s]['metrics']['per_category_recall_at_1'][c]:16.3f}" for s in systems))
 
-    with open("results_hybrid.json", "w", encoding="utf-8") as f:
+    with open("results/hybrid.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print("\nsaved -> results_hybrid.json")
+    print("\nsaved -> results/hybrid.json")
 
 
 if __name__ == "__main__":

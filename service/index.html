@@ -29,8 +29,8 @@
 <body>
 <header>
   <h1>🏠 Нормализация адресов</h1>
-  <div class="muted">Введите «грязный» адрес → канонический объект на карте. Дообученный энкодер + HNSW.</div>
-  <div style="margin-top:10px"><input id="q" placeholder="напр.: казань бауманна 15  ·  ul Baumana 15  ·  екб ленина 20 к3" autofocus></div>
+  <div class="muted">Введите «грязный» адрес → канонический объект ФИАС/ГАР на карте. Дообученный e5 + IVF-PQ · вся РФ (33 млн).</div>
+  <div style="margin-top:10px"><input id="q" placeholder="напр.: казань бауманна 15  ·  ul Baumana 15  ·  краснодар красная 100  ·  курск ленина" autofocus></div>
 </header>
 <main>
   <div id="list"><div class="hint">Начните вводить адрес…</div></div>
@@ -83,12 +83,25 @@ function renderMarkers(results){
   }
 }
 
-function renderList(results){
+function renderList(results, confidence){
   if(!results.length){ listEl.innerHTML = '<div class="hint">Ничего не найдено.</div>'; return; }
+  // Confidence comes from the server: it combines the top score with a lexical
+  // check (the most distinctive query word must fuzzily appear in the result),
+  // so a made-up place like "Задрищенск дом 5" is flagged even at a high score.
   const best = results[0].score;
-  const warn = (best != null && best < 0.5)
-    ? `<div style="margin:6px 4px;padding:9px 12px;border-radius:8px;border:1px solid #5a4a20;background:rgba(255,191,105,.12);color:#ffcf7a;font-size:13px">⚠ Низкая уверенность (score ${best}). Возможно, этого адреса/города нет в базе (16 городов) — показаны ближайшие похожие.</div>`
-    : '';
+  const box = (bd, bg, fg, html) =>
+    `<div style="margin:6px 4px;padding:9px 12px;border-radius:8px;border:1px solid ${bd};background:${bg};color:${fg};font-size:13px">${html}</div>`;
+  let warn = '';
+  if (confidence === 'low') {
+    warn = box('#6e2b2b', 'rgba(255,107,107,.12)', '#ff8a8a',
+      `⛔ <b>Адрес, вероятно, отсутствует в базе.</b> Точного совпадения не найдено (score ${best}) — ниже просто ближайшие похожие.`);
+  } else if (confidence === 'medium') {
+    warn = box('#5a4a20', 'rgba(255,191,105,.12)', '#ffcf7a',
+      `⚠ <b>Средняя уверенность</b> (score ${best}) — проверьте, что адрес верный.`);
+  } else {
+    warn = box('#2c5a2c', 'rgba(126,231,135,.10)', '#8ee79a',
+      `✓ Найдено соответствие (score ${best}).`);
+  }
   listEl.innerHTML = warn + results.map((r,i) =>
     `<div class="card" data-i="${i}">
        <div><span class="rank">#${i+1}</span><span class="addr">${escapeHtml(r.address)}</span></div>
@@ -120,7 +133,7 @@ async function runSearch(q){
     const res = await fetch('/search?q=' + encodeURIComponent(q));
     const data = await res.json();
     lastResults = data.results || [];
-    renderList(lastResults);
+    renderList(lastResults, data.confidence);
     renderMarkers(lastResults);
   }catch(e){ listEl.innerHTML = '<div class="hint">Ошибка запроса.</div>'; }
 }

@@ -118,9 +118,9 @@ def main():
                         recall_at_10=m["recall_at_10"], mrr_at_10=m["mrr_at_10"],
                         memory_mb=round(mem, 2), p50_ms=round(p50, 3)))
 
-    with open("results_shrink.json", "w", encoding="utf-8") as f:
+    with open("results/shrink.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print("\nsaved -> results_shrink.json")
+    print("\nsaved -> results/shrink.json")
 
 
 if __name__ == "__main__":

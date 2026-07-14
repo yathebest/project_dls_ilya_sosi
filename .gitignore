@@ -16,3 +16,4 @@ index_ru/
 *.nodecache
 
 .env
+cloudflared.exe
